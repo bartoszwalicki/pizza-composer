@@ -1,94 +1,106 @@
-# 10x Astro Starter
+# Pizza Composer
 
-A modern, opinionated starter template for building fast, accessible, and AI-friendly web applications.
+A web application MVP designed to help users create and manage unique pizza compositions. Enjoy generating innovative recipes using AI or create your own manually, and save your favorite combinations with ease.
+
+## Table of Contents
+
+- [Pizza Composer](#pizza-composer)
+  - [Table of Contents](#table-of-contents)
+  - [Project Description](#project-description)
+  - [Tech Stack](#tech-stack)
+  - [Getting Started Locally](#getting-started-locally)
+  - [Available Scripts](#available-scripts)
+  - [Project Scope](#project-scope)
+  - [Project Status](#project-status)
+  - [License](#license)
+
+## Project Description
+
+Pizza Composer is an MVP web application aimed at simplifying the creation and management of pizza compositions. The app allows users to generate pizza recipes using AI based on 1-3 base ingredients, or to manually enter ingredients using 10 dedicated text fields. Key features include:
+
+- **AI-generated compositions:** Input a few base ingredients and let the AI generate a detailed layering sequence (up to 10 ingredients).
+- **Manual composition:** Create custom pizza recipes using 10 text fields without strict validation.
+- **User authentication:** Register and log in using email and password, with compositions tied to the user account.
+- **Composition management:** View, rate (1 to 6 stars), and delete saved compositions. Optionally add photos of your pizza creations.
+- **Photo uploads:** Upload images (with constraints of 2000x2000px and 2.5MB) stored securely via Supabase Storage.
+- **Event tracking:** Monitor counts such as generated compositions and uploaded photos for analytics.
 
 ## Tech Stack
 
-- [Astro](https://astro.build/) v5.5.5 - Modern web framework for building fast, content-focused websites
-- [React](https://react.dev/) v19.0.0 - UI library for building interactive components
-- [TypeScript](https://www.typescriptlang.org/) v5 - Type-safe JavaScript
-- [Tailwind CSS](https://tailwindcss.com/) v4.0.17 - Utility-first CSS framework
+**Frontend:**
 
-## Prerequisites
+- Astro 5
+- React 19
+- TypeScript 5
+- Tailwind CSS 4
+- Shadcn/ui
 
-- Node.js v22.14.0 (as specified in `.nvmrc`)
-- npm (comes with Node.js)
+**Backend & Services:**
 
-## Getting Started
+- Supabase (for authentication, database, and storage)
+- AI Integration via external APIs (such as OpenAI, Google, or Anthropic) through Openrouter.ai interface
 
-1. Clone the repository:
+**Runtime:**
 
-```bash
-git clone https://github.com/przeprogramowani/10x-astro-starter.git
-cd 10x-astro-starter
-```
+- Node.js (using version specified in `.nvmrc`: **22.14.0**)
 
-2. Install dependencies:
+## Getting Started Locally
 
-```bash
-npm install
-```
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/bartoszwalicki/pizza-composer.git
+   cd pizza-composer
+   ```
 
-3. Run the development server:
+2. **Install dependencies:**
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-```bash
-npm run dev
-```
+3. **Ensure you are running the required Node version:**
+   The project requires Node.js version 22.14.0, as specified in the `.nvmrc` file.
 
-4. Build for production:
+4. **Start the development server:**
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
 
-```bash
-npm run build
-```
+5. **Build and preview:**
+   ```bash
+   npm run build
+   npm run preview
+   ```
 
 ## Available Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-- `npm run lint:fix` - Fix ESLint issues
+The following scripts are available in `package.json`:
 
-## Project Structure
+- `dev`: Starts the development server.
+- `build`: Builds the project for production.
+- `preview`: Previews the production build locally.
+- `astro`: Runs the Astro command line tool.
+- `lint`: Runs ESLint to check for linting errors.
+- `lint:fix`: Automatically fixes linting errors with ESLint.
+- `format`: Formats the codebase using Prettier.
 
-```md
-.
-├── src/
-│   ├── layouts/    # Astro layouts
-│   ├── pages/      # Astro pages
-│   │   └── api/    # API endpoints
-│   ├── components/ # UI components (Astro & React)
-│   └── assets/     # Static assets
-├── public/         # Public assets
-```
+## Project Scope
 
-## AI Development Support
+This project is designed as an MVP to validate the concept of a pizza composition management application. The key scopes include:
 
-This project is configured with AI development tools to enhance the development experience, providing guidelines for:
+- **AI-Generated Compositions:** Allowing users to generate recipes based on minimal inputs.
+- **Manual Compositions:** Providing a flexible form to manually create and save pizza recipes.
+- **User Management:** Simple registration and login to secure user data and compositions.
+- **Composition Management:** Options to view, rate, and delete saved compositions, along with the ability to upload and display photos.
+- **Analytics:** Tracking key metrics such as the number of AI-generated compositions and photo uploads to measure engagement.
 
-- Project structure
-- Coding practices
-- Frontend development
-- Styling with Tailwind
-- Accessibility best practices
-- Astro and React guidelines
+## Project Status
 
-### Cursor IDE
-
-The project includes AI rules in `.cursor/rules/` directory that help Cursor IDE understand the project structure and provide better code suggestions.
-
-### GitHub Copilot
-
-AI instructions for GitHub Copilot are available in `.github/copilot-instructions.md`
-
-### Windsurf
-
-The `.windsurfrules` file contains AI configuration for Windsurf.
-
-## Contributing
-
-Please follow the AI guidelines and coding practices defined in the AI configuration files when contributing to this project.
+This project is currently at the MVP stage and is under active development. Feedback and contributions are welcome as the application evolves.
 
 ## License
 
-MIT
+This project is licensed under the MIT License.
