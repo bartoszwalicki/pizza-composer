@@ -37,7 +37,7 @@ export type Database = {
       compositions: {
         Row: {
           composition_id: number
-          composition_type: boolean
+          composition_type: Database["public"]["Enums"]["composition_type_enum"]
           created_at: string
           ingredients: string[]
           photo_url: string | null
@@ -46,7 +46,7 @@ export type Database = {
         }
         Insert: {
           composition_id?: number
-          composition_type: boolean
+          composition_type?: Database["public"]["Enums"]["composition_type_enum"]
           created_at?: string
           ingredients: string[]
           photo_url?: string | null
@@ -55,7 +55,7 @@ export type Database = {
         }
         Update: {
           composition_id?: number
-          composition_type?: boolean
+          composition_type?: Database["public"]["Enums"]["composition_type_enum"]
           created_at?: string
           ingredients?: string[]
           photo_url?: string | null
@@ -104,7 +104,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      composition_type_enum: "manual" | "ai-generated"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -222,7 +222,9 @@ export const Constants = {
     Enums: {},
   },
   public: {
-    Enums: {},
+    Enums: {
+      composition_type_enum: ["manual", "ai-generated"],
+    },
   },
 } as const
 

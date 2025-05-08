@@ -37,7 +37,12 @@ Tworzenie nowych, interesujących kompozycji pizzy jest skomplikowanym zadaniem 
    - Zdjęcia są przechowywane w Supabase Storage z podstawowymi zabezpieczeniami.
 
 6. Liczniki zdarzeń
-   - System rejestruje zdarzenia, takie jak liczba wygenerowanych kompozycji (composition_generated_count) i przesłanych zdjęć (photo_uploaded_count) dla celów analitycznych.
+   - System rejestruje zdarzenia, takie jak liczba wygenerowanych kompozycji (`composition_generated_count`) i przesłanych zdjęć (`photo_uploaded_count`) dla celów analitycznych.
+
+7. Logowanie szczegółów generacji AI
+   - Dla każdej pomyślnie wygenerowanej kompozycji przez AI, system zapisuje szczegółowy log.
+   - Log zawiera czas trwania procesu generacji (`generation_duration`), identyfikator użytkownika (`user_id`) oraz identyfikator powiązanej kompozycji (`composition_id`).
+   - Dane te są wykorzystywane do analizy użycia funkcji AI oraz monitorowania jej wydajności.
 
 ## 4. Granice produktu
 - Aplikacja nie umożliwia udostępniania kompozycji innym użytkownikom ani funkcji społecznościowych.

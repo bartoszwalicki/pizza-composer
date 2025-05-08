@@ -2,283 +2,281 @@
 
 ## 1. Resources
 
--   **Users**: Represents application users. Primarily managed by Supabase Auth, but API provides an endpoint for user details including counters.
-    -   Corresponds to `users` table (partially, as Supabase Auth manages core user data).
--   **Compositions**: Represents pizza compositions created by users, either manually or AI-generated.
-    -   Corresponds to `compositions` table.
--   **AI Suggestions**: A non-persistent resource representing AI-generated pizza composition suggestions.
-    -   Does not directly map to a persistent DB table but triggers logic involving external AI and potential creation of `generation_log` upon composition saving.
+-   **Compositions**: Represents a pizza composition.
+    -   Corresponds to the `compositions` table in the database.
+-   **Users**: Represents application users.
+    -   Primarily managed by Supabase Auth. The API interacts with user-related data like counters (`composition_generated_count`, `photo_uploaded_count`) which are fields in the `users` table.
+-   **GenerationLog**: Logs details of AI-generated compositions.
+    -   Corresponds to the `generation_log` table. Entries are created internally when an AI-generated composition is saved.
 
 ## 2. Endpoints
 
-### 2.1 Users
+All endpoints requiring authentication expect a Supabase JWT in the `Authorization: Bearer <token>` header. The `user_id` is derived from this token server-side.
 
-#### `GET /users/me`
+### 2.1 Compositions Resource
 
--   **Description**: Retrieves the profile information of the currently authenticated user, including their ID, email, registration date, and counters for generated compositions and uploaded photos.
--   **HTTP Method**: `GET`
--   **URL Path**: `/api/users/me`
--   **Query Parameters**: None
--   **Request Payload**: None
--   **Response Payload (JSON)**:
+#### 2.1.1 Create a new composition (manual or AI-generated)
+-   **Method**: `POST`
+-   **Path**: `/api/compositions`
+-   **Description**: Creates a new pizza composition. If `composition_type` is `ai-generated`, it also logs the generation event and increments the user's AI generation counter.
+-   **Request Body**:
     ```json
     {
-      "id": "uuid",
-      "email": "user@example.com",
-      "registration_date": "YYYY-MM-DDTHH:mm:ss.sssZ",
-      "composition_generated_count": 0,
-      "photo_uploaded_count": 0
+        "ingredients": ["string"], // Array of strings, max 10 items
+        "composition_type": "manual" | "ai-generated",
+        "rating": null | integer, // Optional: 1-6
+        "photo_url": null | "string", // Optional: URL to the photo
+        "generation_duration": null | "string" // Optional: ISO 8601 duration, e.g., "PT2M3S". Required if composition_type is "ai-generated"
     }
     ```
--   **Success Codes**:
-    -   `200 OK`: User profile retrieved successfully.
--   **Error Codes**:
-    -   `401 Unauthorized`: If the user is not authenticated.
-    -   `404 Not Found`: If the authenticated user's profile cannot be found (should not generally occur if authenticated).
-    -   `500 Internal Server Error`: Server-side error.
-
-### 2.2 Compositions
-
-#### `POST /compositions`
-
--   **Description**: Creates a new pizza composition. This can be a manually entered composition or an AI-generated one that the user has accepted. If it's an AI-generated composition, related AI generation metadata is used to create a `generation_log` entry, and the user's `composition_generated_count` is incremented.
--   **HTTP Method**: `POST`
--   **URL Path**: `/api/compositions`
--   **Query Parameters**: None
--   **Request Payload (JSON)**:
+-   **Response Body (Success)**:
     ```json
     {
-      "ingredients": ["ingredient1", "ingredient2"], // Max 10 ingredients
-      "composition_type": "ai-generated", // ai-generated for AI-generated, manual for manual
-      "rating": null, // Optional: 1-6 or null
-      "photo_url": null, // Optional: URL string or null
-      "ai_generation_metadata": { // Optional: only if composition_type is ai-generated
-        "duration_ms": 5000 // Duration of the AI generation process in milliseconds
-      }
-    }
-    ```
--   **Response Payload (JSON)**:
-    ```json
-    {
-      "composition_id": 1,
-      "user_id": "uuid",
-      "ingredients": ["ingredient1", "ingredient2"],
-      "rating": null,
-      "composition_type": "ai-generated",
-      "created_at": "YYYY-MM-DDTHH:mm:ss.sssZ",
-      "photo_url": null
-      // If composition_type was "ai-generated", a generation_log entry is also created.
+        "composition_id": integer,
+        "user_id": "uuid",
+        "ingredients": ["string"],
+        "rating": integer | null,
+        "composition_type": "manual" | "ai-generated",
+        "created_at": "timestampz",
+        "photo_url": "string" | null
     }
     ```
 -   **Success Codes**:
     -   `201 Created`: Composition created successfully.
 -   **Error Codes**:
-    -   `400 Bad Request`: Invalid input (e.g., too many ingredients, invalid rating).
-    -   `401 Unauthorized`: User not authenticated.
-    -   `500 Internal Server Error`: Server-side error.
+    -   `400 Bad Request`: Invalid input (e.g., more than 10 ingredients, invalid rating, missing `generation_duration` for AI type).
+    -   `401 Unauthorized`: Authentication token missing or invalid.
+    -   `500 Internal Server Error`: Unexpected server error.
 
-#### `GET /compositions`
-
--   **Description**: Retrieves a list of pizza compositions for the authenticated user. Supports pagination and sorting.
--   **HTTP Method**: `GET`
--   **URL Path**: `/api/compositions`
+#### 2.1.2 Get all compositions for the authenticated user
+-   **Method**: `GET`
+-   **Path**: `/api/compositions`
+-   **Description**: Retrieves a list of compositions belonging to the authenticated user. Supports pagination, filtering, and sorting.
 -   **Query Parameters**:
     -   `page` (integer, optional, default: 1): Page number for pagination.
-    -   `limit` (integer, optional, default: 10): Number of items per page.
-    -   `sortBy` (string, optional, default: 'created_at'): Field to sort by (e.g., `created_at`, `rating`).
-    -   `sortOrder` (string, optional, default: 'desc'): Sort order ('asc' or 'desc').
--   **Request Payload**: None
--   **Response Payload (JSON)**:
+    -   `pageSize` (integer, optional, default: 10): Number of items per page.
+    -   `sortBy` (string, optional, default: `created_at`): Field to sort by (e.g., `created_at`, `rating`).
+    -   `sortOrder` (string, optional, default: `desc`): `asc` or `desc`.
+    -   `rating` (integer, optional): Filter by specific rating (1-6).
+    -   `composition_type` (string, optional): Filter by `manual` or `ai-generated`.
+-   **Response Body (Success)**:
     ```json
     {
-      "data": [
-        {
-          "composition_id": 1,
-          "user_id": "uuid",
-          "ingredients": ["ingredient1", "ingredient2"],
-          "rating": 5,
-          "composition_type": "ai-generated",
-          "created_at": "YYYY-MM-DDTHH:mm:ss.sssZ",
-          "photo_url": "http://example.com/photo.jpg"
+        "data": [
+            {
+                "composition_id": integer,
+                "user_id": "uuid",
+                "ingredients": ["string"],
+                "rating": integer | null,
+                "composition_type": "manual" | "ai-generated",
+                "created_at": "timestampz",
+                "photo_url": "string" | null
+            }
+        ],
+        "pagination": {
+            "page": integer,
+            "pageSize": integer,
+            "totalItems": integer,
+            "totalPages": integer
         }
-        // ... more compositions
-      ],
-      "pagination": {
-        "currentPage": 1,
-        "totalPages": 5,
-        "totalItems": 50,
-        "limit": 10
-      }
     }
     ```
 -   **Success Codes**:
     -   `200 OK`: Compositions retrieved successfully.
 -   **Error Codes**:
-    -   `401 Unauthorized`: User not authenticated.
-    -   `500 Internal Server Error`: Server-side error.
+    -   `401 Unauthorized`: Authentication token missing or invalid.
+    -   `500 Internal Server Error`: Unexpected server error.
 
-#### `GET /compositions/{compositionId}`
-
--   **Description**: Retrieves a specific pizza composition by its ID. User must be the owner.
--   **HTTP Method**: `GET`
--   **URL Path**: `/api/compositions/{compositionId}`
--   **Query Parameters**: None
--   **Request Payload**: None
--   **Response Payload (JSON)**:
+#### 2.1.3 Get a specific composition
+-   **Method**: `GET`
+-   **Path**: `/api/compositions/{composition_id}`
+-   **Description**: Retrieves a single composition by its ID. User must own the composition (enforced by RLS).
+-   **Response Body (Success)**:
     ```json
     {
-      "composition_id": 1,
-      "user_id": "uuid",
-      "ingredients": ["ingredient1", "ingredient2"],
-      "rating": 5,
-      "composition_type": "ai-generated",
-      "created_at": "YYYY-MM-DDTHH:mm:ss.sssZ",
-      "photo_url": "http://example.com/photo.jpg"
+        "composition_id": integer,
+        "user_id": "uuid",
+        "ingredients": ["string"],
+        "rating": integer | null,
+        "composition_type": "manual" | "ai-generated",
+        "created_at": "timestampz",
+        "photo_url": "string" | null
     }
     ```
 -   **Success Codes**:
     -   `200 OK`: Composition retrieved successfully.
 -   **Error Codes**:
-    -   `401 Unauthorized`: User not authenticated.
-    -   `403 Forbidden`: User is not the owner of the composition.
+    -   `401 Unauthorized`: Authentication token missing or invalid.
+    -   `403 Forbidden`: User does not have access to this composition.
     -   `404 Not Found`: Composition not found.
-    -   `500 Internal Server Error`: Server-side error.
+    -   `500 Internal Server Error`: Unexpected server error.
 
-#### `PATCH /compositions/{compositionId}`
-
--   **Description**: Updates parts of a specific pizza composition (e.g., rating, photo URL). If `photo_url` is updated, the user's `photo_uploaded_count` is incremented.
--   **HTTP Method**: `PATCH`
--   **URL Path**: `/api/compositions/{compositionId}`
--   **Query Parameters**: None
--   **Request Payload (JSON)**:
+#### 2.1.4 Update a specific composition (e.g., ingredients, rating, photo URL)
+-   **Method**: `PATCH`
+-   **Path**: `/api/compositions/{composition_id}`
+-   **Description**: Partially updates a composition (e.g., its rating or photo URL). User must own the composition. If `photo_url` is updated, increments user's photo upload counter.
+-   **Request Body**:
     ```json
     {
-      "rating": 4, // Optional: 1-6
-      "photo_url": "http://example.com/new_photo.jpg", // Optional
-      "ingredients": ["new_ingredient1"] // Optional, max 10
+        "ingredients": ["string"], // Optional: Array of strings, max 10 items
+        "rating": integer, // Optional: 1-6
+        "photo_url": "string" // Optional: URL to the photo
     }
     ```
--   **Response Payload (JSON)**:
+-   **Response Body (Success)**:
     ```json
     {
-      "composition_id": 1,
-      "user_id": "uuid",
-      "ingredients": ["new_ingredient1"],
-      "rating": 4,
-      "composition_type": "ai-generated",
-      "created_at": "YYYY-MM-DDTHH:mm:ss.sssZ",
-      "photo_url": "http://example.com/new_photo.jpg"
+        "composition_id": integer,
+        "user_id": "uuid",
+        "ingredients": ["string"],
+        "rating": integer | null,
+        "composition_type": "manual" | "ai-generated", // Not updatable via this endpoint directly
+        "created_at": "timestampz",
+        "photo_url": "string" | null
     }
     ```
 -   **Success Codes**:
     -   `200 OK`: Composition updated successfully.
 -   **Error Codes**:
-    -   `400 Bad Request`: Invalid input (e.g., invalid rating, too many ingredients).
-    -   `401 Unauthorized`: User not authenticated.
-    -   `403 Forbidden`: User is not the owner of the composition.
+    -   `400 Bad Request`: Invalid input (e.g., more than 10 ingredients, invalid rating).
+    -   `401 Unauthorized`: Authentication token missing or invalid.
+    -   `403 Forbidden`: User does not have access to this composition.
     -   `404 Not Found`: Composition not found.
-    -   `500 Internal Server Error`: Server-side error.
+    -   `500 Internal Server Error`: Unexpected server error.
 
-#### `DELETE /compositions/{compositionId}`
-
--   **Description**: Deletes a specific pizza composition. Associated `generation_log` (if any) will be deleted due to DB cascade.
--   **HTTP Method**: `DELETE`
--   **URL Path**: `/api/compositions/{compositionId}`
--   **Query Parameters**: None
--   **Request Payload**: None
--   **Response Payload**: None
+#### 2.1.5 Delete a specific composition
+-   **Method**: `DELETE`
+-   **Path**: `/api/compositions/{composition_id}`
+-   **Description**: Deletes a composition by its ID. User must own the composition.
+-   **Response Body (Success)**: None (Empty body)
 -   **Success Codes**:
     -   `204 No Content`: Composition deleted successfully.
 -   **Error Codes**:
-    -   `401 Unauthorized`: User not authenticated.
-    -   `403 Forbidden`: User is not the owner of the composition.
+    -   `401 Unauthorized`: Authentication token missing or invalid.
+    -   `403 Forbidden`: User does not have access to this composition.
     -   `404 Not Found`: Composition not found.
-    -   `500 Internal Server Error`: Server-side error.
+    -   `500 Internal Server Error`: Unexpected server error.
 
-### 2.3 AI Suggestions
+### 2.2 AI Composition Generation
 
-#### `POST /ai/suggestions/pizza`
-
--   **Description**: Generates a pizza composition suggestion using an external AI service based on 1-3 base ingredients provided by the user. This endpoint does not save the composition.
--   **HTTP Method**: `POST`
--   **URL Path**: `/api/ai/suggestions/pizza`
--   **Query Parameters**: None
--   **Request Payload (JSON)**:
+#### 2.2.1 Generate pizza composition suggestions using AI
+-   **Method**: `POST`
+-   **Path**: `/api/compositions/ai-generate`
+-   **Description**: Takes 1-3 base ingredients and returns AI-generated pizza ingredient suggestions. This endpoint itself does not save the composition or log generation; that occurs when the user accepts and saves via `POST /api/compositions`.
+-   **Request Body**:
     ```json
     {
-      "base_ingredients": ["tomato sauce", "mozzarella"] // 1-3 ingredients
+        "base_ingredients": ["string"] // Array of 1 to 3 strings
     }
     ```
--   **Response Payload (JSON)**:
+-   **Response Body (Success)**:
     ```json
     {
-      "suggested_ingredients": ["tomato sauce", "mozzarella", "basil", "oregano"], // Max 10, in order
-      "ai_generation_metadata": {
-        "duration_ms": 5320 // Duration of the AI call and processing in milliseconds
-        // Potentially other metadata from AI if useful, e.g., model used
-      }
+        "suggested_ingredients": ["string"], // Max 10 ingredients, ordered
+        "generation_duration_ms": integer // Duration of the AI call in milliseconds, for client to pass to POST /compositions
     }
     ```
 -   **Success Codes**:
-    -   `200 OK`: Suggestion generated successfully.
+    -   `200 OK`: Suggestions generated successfully.
 -   **Error Codes**:
-    -   `400 Bad Request`: Invalid input (e.g., no base ingredients, too many base ingredients).
-    -   `401 Unauthorized`: User not authenticated.
-    -   `500 Internal Server Error`: Server-side error (e.g., external AI service failure).
-    -   `503 Service Unavailable`: External AI service is unavailable or rate limit hit.
+    -   `400 Bad Request`: Invalid input (e.g., incorrect number of base ingredients).
+    -   `401 Unauthorized`: Authentication token missing or invalid.
+    -   `500 Internal Server Error`: AI service error or other unexpected server error.
+    -   `503 Service Unavailable`: AI service is temporarily unavailable.
+
+### 2.3 GenerationLog Resource
+
+#### 2.3.1 Get all generation logs for the authenticated user
+-   **Method**: `GET`
+-   **Path**: `/api/generation-logs`
+-   **Description**: Retrieves a paginated list of AI composition generation logs belonging to the authenticated user.
+-   **Query Parameters**:
+    -   `page` (integer, optional, default: 1): Page number for pagination.
+    -   `pageSize` (integer, optional, default: 10): Number of items per page.
+    -   `sortBy` (string, optional, default: `generation_id`): Field to sort by (e.g., `generation_id`, `generation_duration`).
+    -   `sortOrder` (string, optional, default: `desc`): `asc` or `desc`.
+-   **Response Body (Success)**:
+    ```json
+    {
+        "data": [
+            {
+                "generation_id": integer,
+                "user_id": "uuid", // Matches authenticated user
+                "composition_id": integer,
+                "generation_duration": "string" // e.g., "PT2M3.5S" or total milliseconds
+            }
+        ],
+        "pagination": {
+            "page": integer,
+            "pageSize": integer,
+            "totalItems": integer,
+            "totalPages": integer
+        }
+    }
+    ```
+-   **Success Codes**:
+    -   `200 OK`: Generation logs retrieved successfully.
+-   **Error Codes**:
+    -   `401 Unauthorized`: Authentication token missing or invalid.
+    -   `500 Internal Server Error`: Unexpected server error.
 
 ## 3. Authentication and Authorization
 
--   **Authentication Mechanism**: JWT (JSON Web Tokens) provided by Supabase Auth.
-    -   Clients obtain a JWT upon successful login or registration via Supabase Auth endpoints.
-    -   This JWT must be included in the `Authorization` header of API requests as a Bearer token (e.g., `Authorization: Bearer <your_supabase_jwt>`).
+-   **Authentication**:
+    -   Handled by Supabase Auth. Clients must obtain a JWT by signing up/logging in using Supabase client SDKs.
+    -   All protected API endpoints (all listed endpoints unless specified otherwise) require this JWT to be passed in the `Authorization: Bearer <TOKEN>` header.
 -   **Authorization**:
-    -   Most endpoints require authentication.
-    -   Authorization is enforced using Supabase's Row Level Security (RLS) policies on the database tables (e.g., `compositions` table has an RLS policy `USING (user_id = auth.uid())`).
-    -   API logic will further ensure that users can only access or modify their own resources. For example, when fetching or modifying a composition, the API verifies that `composition.user_id` matches the authenticated user's ID.
+    -   Row-Level Security (RLS) is enabled on the `compositions` table in PostgreSQL, as defined in `db-plan.md`.
+    -   The policy `user_isolation ON compositions USING (user_id = current_setting('app.current_user'))` ensures that users can only access and modify their own compositions.
+    -   Similarly, RLS should be enabled on the `generation_log` table to ensure users can only view their own logs. A suitable policy would be:
+        ```sql
+        CREATE POLICY user_can_view_own_generation_logs ON generation_log
+            FOR SELECT
+            USING (user_id = current_setting('app.current_user'));
+        ALTER TABLE generation_log ENABLE ROW LEVEL SECURITY;
+        ```
+    -   The API backend (Astro API routes) will use the Supabase Admin SDK or pass the user's JWT to Supabase to correctly set the `app.current_user` session variable for RLS to take effect for both `compositions` and `generation_log` tables.
 
 ## 4. Validation and Business Logic
 
-### 4.1 Validation
-
--   **`POST /compositions` & `PATCH /compositions/{compositionId}` (for ingredients)**:
-    -   `ingredients`: Must be an array.
-    -   `ingredients` array length: Must be between 1 and 10 (inclusive), as per DB schema `CHECK (array_length(ingredients, 1) <= 10)`. PRD also mentions "maksymalnie do 10 pozycji".
--   **`POST /compositions` & `PATCH /compositions/{compositionId}` (for rating)**:
-    -   `rating`: If provided, must be an integer between 1 and 6 (inclusive), as per DB schema `CHECK (rating BETWEEN 1 AND 6)`.
--   **`POST /ai/suggestions/pizza`**:
-    -   `base_ingredients`: Must be an array with 1 to 3 string elements, as per PRD "Użytkownik wprowadza 1-3 składniki bazowe".
--   **Photo Upload Constraints (Handled by Client & Supabase Storage)**:
-    -   PRD: "Zdjęcie musi spełniać ograniczenia rozdzielczości (max 2000x2000px) oraz rozmiaru (2.5MB)."
-    -   These validations are primarily handled client-side before uploading to Supabase Storage. The API only receives the `photo_url`.
+### 4.1 Validation Rules
+-   **Compositions**:
+    -   `ingredients`: Must be an array of strings. Maximum of 10 ingredients. (Validated at `POST /api/compositions`, `PATCH /api/compositions/{id}`)
+    -   `rating`: Must be an integer between 1 and 6 (inclusive), if provided. (Validated at `POST /api/compositions`, `PATCH /api/compositions/{id}`)
+    -   `composition_type`: Must be either `manual` or `ai-generated`. (Validated at `POST /api/compositions`)
+    -   `generation_duration`: Required if `composition_type` is `ai-generated`. Must be a valid ISO 8601 duration string or an integer representing milliseconds. (Validated at `POST /api/compositions`)
+-   **AI Generation**:
+    -   `base_ingredients`: Must be an array of 1 to 3 strings. (Validated at `POST /api/compositions/ai-generate`)
 
 ### 4.2 Business Logic Implementation
-
 -   **AI Composition Generation & Logging**:
-    1.  `POST /ai/suggestions/pizza`:
-        -   Receives 1-3 base ingredients.
-        -   Constructs a prompt and calls the external AI service (e.g., Openrouter.ai).
-        -   Measures the duration of the AI call.
-        -   Returns the suggested ingredients list (max 10) and the duration.
-    2.  `POST /compositions` (when `composition_type` is ` ai-generated`):
-        -   Receives the accepted ingredients and `ai_generation_metadata` (including duration).
-        -   Saves the composition with `composition_type = ai-generated`.
-        -   Creates an entry in the `generation_log` table, linking `user_id`, the new `composition_id`, and the `generation_duration` from the metadata.
-        -   Increments the `composition_generated_count` for the user in the `users` table.
+    1.  Client calls `POST /api/compositions/ai-generate` with 1-3 base ingredients.
+    2.  API contacts the external AI service (e.g., Openrouter.ai).
+    3.  API returns suggested ingredients (max 10) and the duration of the AI call.
+    4.  User reviews suggestions. If accepted, client calls `POST /api/compositions` with:
+        -   `ingredients`: The suggested (or modified) list.
+        -   `composition_type`: `ai-generated`.
+        -   `generation_duration`: The duration returned by the AI generation endpoint.
+    5.  The `POST /api/compositions` endpoint then:
+        -   Saves the composition to the `compositions` table.
+        -   Creates an entry in the `generation_log` table (linking `user_id`, new `composition_id`, and `generation_duration`).
+        -   Increments the `composition_generated_count` in the `users` table for the authenticated user.
 -   **Manual Composition Creation**:
-    -   `POST /compositions` (when `composition_type` is `manual`):
-        -   Saves the composition with `composition_type = manual`. No `generation_log` entry is created.
--   **Photo Linking & Counting**:
-    -   `PATCH /compositions/{compositionId}`:
-        -   If `photo_url` is provided and is different from the existing one (or if the existing one was null):
-            -   Updates the `compositions.photo_url` field.
-            -   Increments the `photo_uploaded_count` for the user in the `users` table. (This should only happen if a *new* photo URL is being set, not if it's removed or unchanged).
--   **User-Specific Data Access**:
-    -   All operations on `compositions` (GET list, GET single, PATCH, DELETE) are filtered by the authenticated `user_id`, enforced by both API logic and RLS in Supabase.
--   **Counters Update**:
-    -   `composition_generated_count`: Incremented via `POST /compositions` when an AI composition is saved.
-    -   `photo_uploaded_count`: Incremented via `PATCH /compositions/{compositionId}` when a `photo_url` is newly set or updated.
--   **Pagination and Sorting**:
-    -   Implemented in `GET /compositions` to handle potentially large lists of compositions efficiently.
--   **Cascade Deletes**:
-    -   The database schema defines `ON DELETE CASCADE` for `generation_log` when a `composition` is deleted, and for `compositions` and `generation_log` when a `user` is deleted (though user deletion is managed by Supabase Auth, which also handles cascading deletes of related data in Auth schema). This ensures data integrity. 
+    1.  Client calls `POST /api/compositions` with `ingredients` and `composition_type: 'manual'`.
+    2.  API saves the composition.
+-   **Photo Upload**:
+    1.  PRD: "Zdjęcia są przechowywane w Supabase Storage". Client uploads photo directly to Supabase Storage using Supabase client SDK.
+    2.  Client obtains the public URL or storage path of the uploaded photo.
+    3.  Client calls `PATCH /api/compositions/{composition_id}` with the `photo_url`.
+    4.  The API updates the `compositions` table with the `photo_url`.
+    5.  The API increments the `photo_uploaded_count` in the `users` table for the authenticated user.
+    6.  Photo size (2.5MB) and resolution (2000x2000px) constraints:
+        -   Size can be enforced by Supabase Storage bucket policies.
+        -   Resolution should ideally be checked client-side before upload, or server-side if files were proxied (not the current design).
+-   **User Counters**:
+    -   `composition_generated_count`: Incremented automatically by the API when a composition with `type: 'ai-generated'` is successfully saved via `POST /api/compositions`.
+    -   `photo_uploaded_count`: Incremented automatically by the API when a `photo_url` is successfully added/updated for a composition via `PATCH /api/compositions/{composition_id}`.
+-   **Rate Limiting**:
+    -   Consider implementing rate limiting on API endpoints (especially `/api/compositions/ai-generate` and authentication endpoints) to prevent abuse. This can be done using Astro middleware or a reverse proxy / API gateway. (Not detailed in PRD but a standard best practice).
+-   **Pagination and Filtering**:
+    -   The `GET /api/compositions` endpoint supports pagination, sorting, and filtering to allow efficient data retrieval. 
