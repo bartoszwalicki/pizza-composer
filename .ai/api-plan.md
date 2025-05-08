@@ -165,7 +165,7 @@
       "user_id": "uuid",
       "ingredients": ["new_ingredient1"],
       "rating": 4,
-      "composition_type": false,
+      "composition_type": "ai-generated",
       "created_at": "YYYY-MM-DDTHH:mm:ss.sssZ",
       "photo_url": "http://example.com/new_photo.jpg"
     }

@@ -17,7 +17,7 @@ This table is managed by Supabase Auth.
 - `user_id` UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE
 - `ingredients` TEXT[] NOT NULL CHECK (array_length(ingredients, 1) <= 10)
 - `rating` INTEGER CHECK (rating BETWEEN 1 AND 6)
-- `composition_type` BOOLEAN NOT NULL
+- `composition_type` ENUM NOT NULL DEFAULT manual
 - `created_at` TIMESTAMPTZ NOT NULL DEFAULT NOW()
 - `photo_url` TEXT
 
@@ -61,5 +61,5 @@ This table is managed by Supabase Auth.
 ## 5. Dodatkowe uwagi
 - Schemat został zaprojektowany z myślą o skalowalności i wydajności poprzez odpowiednie indeksowanie.
 - Ograniczenie dla tablicy `ingredients` gwarantuje, że kompozycja nie przekroczy 10 składników.
-- Kolumna `composition_type` (BOOLEAN) określa, czy kompozycja została wygenerowana przez AI (TRUE) czy wprowadzona ręcznie (FALSE).
+- Kolumna `composition_type` (ENUM) określa, czy kompozycja została wygenerowana przez AI (ai-generated) czy wprowadzona ręcznie (manual).
 - Użycie kluczy obcych z kaskadowym usuwaniem zapewnia spójność danych w przypadku usunięcia użytkownika lub kompozycji. 
