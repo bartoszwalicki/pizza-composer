@@ -14,6 +14,7 @@ alwaysApply: true
 - React 19
 - Tailwind 4
 - Shadcn/ui
+- Zod 4
 
 ## Project Structure
 

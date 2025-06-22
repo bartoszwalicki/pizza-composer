@@ -6,7 +6,8 @@ import type { Database } from './db/database.types';
 declare global {
   namespace App {
     interface Locals {
-      supabase: SupabaseClient<Database>;
+      supabase: import('./db/supabase.client').SupabaseClient;
+      user: import('@supabase/supabase-js').User | null;
     }
   }
 }

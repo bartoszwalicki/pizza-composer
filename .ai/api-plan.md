@@ -18,15 +18,14 @@ All endpoints requiring authentication expect a Supabase JWT in the `Authorizati
 #### 2.1.1 Create a new composition (manual or AI-generated)
 -   **Method**: `POST`
 -   **Path**: `/api/compositions`
--   **Description**: Creates a new pizza composition. If `composition_type` is `ai-generated`, it also logs the generation event and increments the user's AI generation counter.
+-   **Description**: Creates a new pizza composition. For `manual` type, saves the provided ingredients as-is. For `ai-generated` type, takes 1-3 base ingredients, generates AI suggestions (including base ingredients), saves the composition, logs the generation event, and increments the user's AI generation counter.
 -   **Request Body**:
     ```json
     {
-        "ingredients": ["string"], // Array of strings, max 10 items
         "composition_type": "manual" | "ai-generated",
+        "ingredients": ["string"], // For manual: final ingredients array (max 10). For ai-generated: base ingredients (1-3 items)
         "rating": null | integer, // Optional: 1-6
-        "photo_url": null | "string", // Optional: URL to the photo
-        "generation_duration": null | "string" // Optional: ISO 8601 duration, e.g., "PT2M3S". Required if composition_type is "ai-generated"
+        "photo_url": null | "string" // Optional: URL to the photo
     }
     ```
 -   **Response Body (Success)**:
@@ -34,7 +33,7 @@ All endpoints requiring authentication expect a Supabase JWT in the `Authorizati
     {
         "composition_id": integer,
         "user_id": "uuid",
-        "ingredients": ["string"],
+        "ingredients": ["string"], // For ai-generated: the full generated list including base ingredients
         "rating": integer | null,
         "composition_type": "manual" | "ai-generated",
         "created_at": "timestampz",
@@ -44,9 +43,10 @@ All endpoints requiring authentication expect a Supabase JWT in the `Authorizati
 -   **Success Codes**:
     -   `201 Created`: Composition created successfully.
 -   **Error Codes**:
-    -   `400 Bad Request`: Invalid input (e.g., more than 10 ingredients, invalid rating, missing `generation_duration` for AI type).
+    -   `400 Bad Request`: Invalid input (e.g., more than 10 ingredients for manual, more than 3 base ingredients for ai-generated, invalid rating).
     -   `401 Unauthorized`: Authentication token missing or invalid.
     -   `500 Internal Server Error`: Unexpected server error.
+    -   `503 Service Unavailable`: AI service is temporarily unavailable (for ai-generated type).
 
 #### 2.1.2 Get all compositions for the authenticated user
 -   **Method**: `GET`
@@ -159,31 +159,6 @@ All endpoints requiring authentication expect a Supabase JWT in the `Authorizati
 
 ### 2.2 AI Composition Generation
 
-#### 2.2.1 Generate pizza composition suggestions using AI
--   **Method**: `POST`
--   **Path**: `/api/compositions/ai-generate`
--   **Description**: Takes 1-3 base ingredients and returns AI-generated pizza ingredient suggestions. This endpoint itself does not save the composition or log generation; that occurs when the user accepts and saves via `POST /api/compositions`.
--   **Request Body**:
-    ```json
-    {
-        "base_ingredients": ["string"] // Array of 1 to 3 strings
-    }
-    ```
--   **Response Body (Success)**:
-    ```json
-    {
-        "suggested_ingredients": ["string"], // Max 10 ingredients, ordered
-        "generation_duration_ms": integer // Duration of the AI call in milliseconds, for client to pass to POST /compositions
-    }
-    ```
--   **Success Codes**:
-    -   `200 OK`: Suggestions generated successfully.
--   **Error Codes**:
-    -   `400 Bad Request`: Invalid input (e.g., incorrect number of base ingredients).
-    -   `401 Unauthorized`: Authentication token missing or invalid.
-    -   `500 Internal Server Error`: AI service error or other unexpected server error.
-    -   `503 Service Unavailable`: AI service is temporarily unavailable.
-
 ### 2.3 GenerationLog Resource
 
 #### 2.3.1 Get all generation logs for the authenticated user
@@ -241,29 +216,28 @@ All endpoints requiring authentication expect a Supabase JWT in the `Authorizati
 
 ### 4.1 Validation Rules
 -   **Compositions**:
-    -   `ingredients`: Must be an array of strings. Maximum of 10 ingredients. (Validated at `POST /api/compositions`, `PATCH /api/compositions/{id}`)
+    -   `ingredients`: 
+        - For manual compositions: Must be an array of strings. Maximum of 10 ingredients.
+        - For ai-generated compositions: Must be an array of 1-3 base ingredient strings.
     -   `rating`: Must be an integer between 1 and 6 (inclusive), if provided. (Validated at `POST /api/compositions`, `PATCH /api/compositions/{id}`)
     -   `composition_type`: Must be either `manual` or `ai-generated`. (Validated at `POST /api/compositions`)
-    -   `generation_duration`: Required if `composition_type` is `ai-generated`. Must be a valid ISO 8601 duration string or an integer representing milliseconds. (Validated at `POST /api/compositions`)
 -   **AI Generation**:
-    -   `base_ingredients`: Must be an array of 1 to 3 strings. (Validated at `POST /api/compositions/ai-generate`)
+    -   Validation is now handled within the `POST /api/compositions` endpoint when `composition_type` is `ai-generated`.
 
 ### 4.2 Business Logic Implementation
 -   **AI Composition Generation & Logging**:
-    1.  Client calls `POST /api/compositions/ai-generate` with 1-3 base ingredients.
-    2.  API contacts the external AI service (e.g., Openrouter.ai).
-    3.  API returns suggested ingredients (max 10) and the duration of the AI call.
-    4.  User reviews suggestions. If accepted, client calls `POST /api/compositions` with:
-        -   `ingredients`: The suggested (or modified) list.
-        -   `composition_type`: `ai-generated`.
-        -   `generation_duration`: The duration returned by the AI generation endpoint.
-    5.  The `POST /api/compositions` endpoint then:
-        -   Saves the composition to the `compositions` table.
-        -   Creates an entry in the `generation_log` table (linking `user_id`, new `composition_id`, and `generation_duration`).
-        -   Increments the `composition_generated_count` in the `users` table for the authenticated user.
+    1.  Client calls `POST /api/compositions` with:
+        -   `composition_type`: `ai-generated`
+        -   `ingredients`: Array of 1-3 base ingredients
+    2.  API contacts the external AI service (e.g., Openrouter.ai) with base ingredients.
+    3.  API receives AI-generated ingredient suggestions (max 10, including base ingredients).
+    4.  API saves the composition to the `compositions` table with the full generated ingredient list.
+    5.  API creates an entry in the `generation_log` table (linking `user_id`, new `composition_id`, and `generation_duration`).
+    6.  API increments the `composition_generated_count` in the `users` table for the authenticated user.
+    7.  API returns the composition with the full generated ingredient list.
 -   **Manual Composition Creation**:
     1.  Client calls `POST /api/compositions` with `ingredients` and `composition_type: 'manual'`.
-    2.  API saves the composition.
+    2.  API saves the composition with the provided ingredients.
 -   **Photo Upload**:
     1.  PRD: "Zdjęcia są przechowywane w Supabase Storage". Client uploads photo directly to Supabase Storage using Supabase client SDK.
     2.  Client obtains the public URL or storage path of the uploaded photo.
@@ -277,6 +251,6 @@ All endpoints requiring authentication expect a Supabase JWT in the `Authorizati
     -   `composition_generated_count`: Incremented automatically by the API when a composition with `type: 'ai-generated'` is successfully saved via `POST /api/compositions`.
     -   `photo_uploaded_count`: Incremented automatically by the API when a `photo_url` is successfully added/updated for a composition via `PATCH /api/compositions/{composition_id}`.
 -   **Rate Limiting**:
-    -   Consider implementing rate limiting on API endpoints (especially `/api/compositions/ai-generate` and authentication endpoints) to prevent abuse. This can be done using Astro middleware or a reverse proxy / API gateway. (Not detailed in PRD but a standard best practice).
+    -   Consider implementing rate limiting on API endpoints (especially AI-generated composition creation and authentication endpoints) to prevent abuse. This can be done using Astro middleware or a reverse proxy / API gateway. (Not detailed in PRD but a standard best practice).
 -   **Pagination and Filtering**:
     -   The `GET /api/compositions` endpoint supports pagination, sorting, and filtering to allow efficient data retrieval. 

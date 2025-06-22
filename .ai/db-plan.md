@@ -38,6 +38,7 @@ This table is managed by Supabase Auth.
 - `generation_duration` INTERVAL NOT NULL
 - `user_id` UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE
 - `composition_id` INTEGER NOT NULL REFERENCES compositions(composition_id) ON DELETE CASCADE
+- `generation_result` TEXT
 
 ## 2. Relacje między tabelami
 - `users` (1) ⇔ (N) `compositions` (jeden użytkownik może mieć wiele kompozycji)
